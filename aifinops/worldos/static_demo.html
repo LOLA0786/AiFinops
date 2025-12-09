@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<head><title>WORLDOS Demo</title></head>
+<body>
+<h1>WORLDOS Demo</h1>
+<div id="status">Loading...</div>
+<button onclick="step()">Run Step</button>
+<script>
+async function step(){
+  const r = await fetch('/step', {method:'POST'});
+  const j = await r.json();
+  document.getElementById('status').innerText = JSON.stringify(j);
+}
+async function load(){
+  const r = await fetch('/status');
+  const j = await r.json();
+  document.getElementById('status').innerText = JSON.stringify(j);
+}
+load();
+</script>
+</body>
+</html>
