@@ -1,0 +1,67 @@
+name: ChatOps Runner
+
+on:
+  repository_dispatch:
+    types: [ chatops ]
+
+permissions:
+  contents: read
+  actions: write
+  id-token: write
+  checks: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run-chatops:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Parse payload and run action (safe: dry-run unless CONFIRM_CHATOPS=true)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          CONFIRM_CHATOPS: ${{ secrets.CONFIRM_CHATOPS }}   # set to "true" only if ready
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Received repository_dispatch payload:"
+          echo "$GITHUB_EVENT_NAME"
+          python3 - <<'PY'
+import os, json
+evt = json.load(open(os.environ.get('GITHUB_EVENT_PATH')))
+payload = evt.get('client_payload', {})
+action = payload.get('action')
+args = payload.get('args', [])
+print("Action:", action, "Args:", args)
+# Map verbs to CLI commands
+cmd_map = {
+    "optimize": f"python3 main.py explain-bill --days {' '.join(args) if args else '3'}",
+    "explain-bill": f"python3 main.py explain-bill --days {' '.join(args) if args else '3'}",
+    "detect-anomalies": f"python3 main.py detect-anomalies --days {' '.join(args) if args else '7'}",
+    "simulate": f"python3 main.py simulate --service AmazonEC2 --pct 0.5",
+    "analyze-util": f"python3 main.py analyze-util --minutes 60 --threshold 5.0",
+    "forecast": f"python3 main.py explain-bill --days {' '.join(args) if args else '14'}",
+    "create-pr": f"python3 main.py create-pr --repo ${os.getenv('GITHUB_REPOSITORY')} --branch chatops-auto-$(date +%s) --title 'ChatOps: auto report' --days {' '.join(args) if args else '3'} --push"
+}
+if action not in cmd_map:
+    print("Unknown action:", action)
+else:
+    cmd = cmd_map[action]
+    confirm = os.getenv('CONFIRM_CHATOPS', 'false').lower() in ('1','true','yes')
+    print("Command (dry-run):", cmd)
+    if confirm:
+        print("CONFIRM_CHATOPS=true -> executing for real")
+        os.system(cmd)
+    else:
+        print("Dry-run mode. To enable execution set CONFIRM_CHATOPS secret to true.")
+PY
