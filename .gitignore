@@ -1,0 +1,98 @@
+# ============================
+# AiFinOps .gitignore
+# ============================
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.egg
+*.egg-info/
+*.log
+*.sqlite3
+
+# ---- Virtual environments ----
+.venv/
+venv/
+ENV/
+env/
+
+# ---- Build / packaging ----
+build/
+dist/
+*.whl
+.eggs/
+*.manifest
+*.spec
+
+# ---- Secrets / Config ----
+.env
+.env.local
+.env.prod
+.env.dev
+*.pem
+*.key
+*.crt
+*.token
+token.txt
+secrets.json
+credentials.json
+
+# ---- GPU Agent temporary files ----
+gpu_logs/
+gpu_cache/
+gpu_tmp/
+tmp/
+*.nvml
+*.nvsmi
+
+# ---- Node / JS (if dashboard expands) ----
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# ---- Streamlit ----
+.streamlit/secrets.toml
+.streamlit/state.json
+
+# ---- MacOS Junk ----
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# ---- GitHub Action caches ----
+.github/**/cache/
+.github/workflows/*.tmp
+
+# ---- Editor folders ----
+.vscode/
+.idea/
+*.swp
+
+# ---- Data & ML outputs ----
+datasets/
+data/
+checkpoints/
+model_output/
+artifacts/
+*.ckpt
+*.pt
+*.bin
+
+# ---- Docker ----
+*.dockerfile
+docker_cache/
+
+# ---- Compiled GPU metrics ----
+gpu_metrics_cache/
+gpu_scheduler_cache/
+
+# ---- Temporary PR files ----
+pr_output/
+pr_drafts/
+
