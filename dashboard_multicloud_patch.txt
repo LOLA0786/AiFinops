@@ -7,3 +7,14 @@ items = fetch_multicloud_costs(provider.lower(), days=3)
 
 st.subheader(f"Costs for {provider}")
 st.write(items)
+
+# --- BEST GPU PRICE WIDGET ---
+st.header("💰 Best GPU Prices Across Clouds")
+gpu_type = st.selectbox("Select GPU type", ["A100","H100","L4","MI300X"])
+from aifinops.multicloud.price_map import best_gpu_price
+st.write(best_gpu_price(gpu_type))
+
+# --- SCHEDULING RECOMMENDATIONS ---
+st.header("🔥 GPU Scheduling Recommendations")
+from aifinops.multicloud.scheduler import recommend_gpu_placement
+st.write(recommend_gpu_placement(gpu_data))
