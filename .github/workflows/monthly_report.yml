@@ -1,0 +1,39 @@
+name: Monthly FinOps Report
+
+on:
+  schedule:
+    - cron: "0 5 1 * *"   # first day of every month
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: pip install -r requirements.txt reportlab
+
+      - name: Generate FinOps Report
+        run: |
+          python3 << 'PY'
+from aifinops.monthly_report import generate_monthly_report
+import json
+
+# Dummy placeholders for now
+costs = {"top_services": ["EC2", "Lambda"], "total": 123.45}
+gpu_stats = {"idle": 3, "zombie": 1}
+forecast = {"next_month": 140.0}
+
+pdf = generate_monthly_report(costs, gpu_stats, forecast)
+print("Generated:", pdf)
+PY
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: finops-monthly-report
+          path: finops_monthly_report.pdf

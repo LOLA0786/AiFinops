@@ -1,0 +1,17 @@
+[project]
+name = "AiFinOps Dashboard"
+description = "AI-powered FinOps cost optimization system"
+python_version = "3.10"
+
+[server]
+command = "streamlit run dashboard.py"
+
+[packages]
+requirements = "requirements.txt"
+
+[env]
+LLM_PROVIDER = "openai"
+OPENAI_API_KEY = "\${OPENAI_API_KEY}"
+AWS_ACCESS_KEY_ID = "\${AWS_ACCESS_KEY_ID}"
+AWS_SECRET_ACCESS_KEY = "\${AWS_SECRET_ACCESS_KEY}"
+AWS_DEFAULT_REGION = "us-east-1"

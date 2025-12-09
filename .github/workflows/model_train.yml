@@ -1,0 +1,74 @@
+name: Train Spike Prediction Model
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 * * *"   # daily at 04:00 UTC
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install deps
+        run: pip install -r requirements.txt scikit-learn numpy pandas matplotlib
+
+      - name: Train model
+        id: train
+        run: |
+          python3 << 'PY'
+import json, numpy as np, pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error
+import joblib, os
+
+# Load dataset
+df = pd.read_json("dataflywheel_snapshot.json")["data"]
+rows = []
+for k,v in df.items():
+    rows.append([v["cost_sum"], v["count"]])
+X = np.array(rows)
+y = X[:,0]  # predict cost
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
+model = RandomForestRegressor().fit(X_train, y_train)
+pred = model.predict(X_test)
+mae = mean_absolute_error(y_test, pred)
+
+os.makedirs("model", exist_ok=True)
+joblib.dump(model, "model/spike_predictor.pkl")
+
+print("MODEL_MAE=", mae)
+with open("training_metrics.json","w") as f:
+    json.dump({"MAE": mae}, f)
+
+PY
+
+      - name: Upload Model Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: spike-predictor
+          path: model/spike_predictor.pkl
+
+      - name: Commit Metrics
+        run: |
+          git config user.name "AiFinOps Bot"
+          git config user.email "actions@github.com"
+          git add training_metrics.json || true
+          git commit -m "Model training metrics update" || true
+          git push || true
+
