@@ -1,0 +1,9 @@
+# Add to dashboard.py
+
+provider = st.selectbox("Choose Cloud Provider", ["AWS", "GCP", "Azure"])
+
+from aifinops.multicloud.router import fetch_multicloud_costs
+items = fetch_multicloud_costs(provider.lower(), days=3)
+
+st.subheader(f"Costs for {provider}")
+st.write(items)
