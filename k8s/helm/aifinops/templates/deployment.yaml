@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aifinops-agent
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels: { app: aifinops-agent }
+  template:
+    metadata:
+      labels: { app: aifinops-agent }
+    spec:
+      containers:
+      - name: aifinops-agent
+        image: {{ .Values.image }}
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: dev
+          mountPath: /dev
+      volumes:
+        - name: dev
+          hostPath:
+            path: /dev

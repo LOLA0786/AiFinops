@@ -1,0 +1,4 @@
+apiVersion: v2
+name: aifinops
+description: AiFinOps GPU + Cost Agent
+version: 0.1.0

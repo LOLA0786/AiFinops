@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aifinops
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-optimizer-agent
+  namespace: aifinops
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: gpu-optimizer }
+  template:
+    metadata:
+      labels: { app: gpu-optimizer }
+    spec:
+      containers:
+      - name: gpu-optimizer
+        image: ghcr.io/aifinops/gpu-agent:latest
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: devfs
+          mountPath: /dev
+      volumes:
+      - name: devfs
+        hostPath:
+          path: /dev
