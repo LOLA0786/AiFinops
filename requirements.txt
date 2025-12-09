@@ -12,3 +12,7 @@ prophet
 nvidia-ml-py3        # optional; used if NVML available
 psutil               # process checks
 plotly               # nicer heatmaps (optional)
+kubernetes
+plotly
+pandas
+python-dateutil

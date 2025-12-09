@@ -126,3 +126,43 @@ try:
     render_cost_estimator()
 except Exception as e:
     st.warning("GPU panel load failed: " + str(e))
+
+st.header("GPU Insights (K8s & Training)")
+try:
+    from aifinops.k8s_gpu import list_gpu_pods, map_nodes_with_gpus
+    from aifinops.training_log_parser import parse_training_log, build_llm_prompt
+    from aifinops.gpu_heatmap_weekly import aggregate_gpu_timeseries, write_pr_snippet
+    st.subheader("Kubernetes GPU Pods")
+    pods = list_gpu_pods() or []
+    if pods:
+        st.write("GPU pods sample:", pods[:10])
+    else:
+        st.info("No GPU pods found or no K8s access.")
+
+    st.subheader("Training Log Analysis (paste sample logs)")
+    txt = st.text_area("Paste training log tail (200 lines)", height=200)
+    if st.button("Analyze logs"):
+        summary = parse_training_log(txt)
+        st.json(summary)
+        prompt = build_llm_prompt("You are diagnosing training problems.", summary)
+        st.code(prompt)
+
+    st.subheader("Weekly Heatmap + PR generator")
+    st.info("Upload timeseries JSON of {ts,gpu_index,gpu_util} or use local monitor output.")
+    uploaded = st.file_uploader("Timeseries JSON", type=["json"])
+    if uploaded:
+        import json
+        samples = json.load(uploaded)
+        pivot = aggregate_gpu_timeseries(samples)
+        st.dataframe(pivot)
+        if st.button("Generate PR snippet"):
+            # naive recommendations: if avg util < 10 -> scale down
+            recs = []
+            avg = pivot.mean().to_dict()
+            for k,v in avg.items():
+                if v < 10:
+                    recs.append({"node":str(k),"instance":"p4d.24xlarge","issue":"low_util","suggest":"scale-to-0-or-spot"})
+            path = write_pr_snippet(recs)
+            st.success(f"Wrote PR snippet to {path}")
+except Exception as e:
+    st.warning("GPU Insights load failed: " + str(e))
