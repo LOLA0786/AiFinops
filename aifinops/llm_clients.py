@@ -1,94 +1,142 @@
-import os
-from typing import Literal, Optional
+from __future__ import annotations
 
 import httpx
-
-Provider = Literal["xai", "openai", "gemini", "anthropic"]
+import os
+from typing import Optional, Dict, Any, Generator
 
 class LLMClient:
-    def __init__(self, provider: Provider):
+    """
+    Universal LLM client with OpenAI streaming support.
+    """
+
+    def __init__(self, provider: str):
         self.provider = provider
 
-    async def _post_json(self, url: str, headers: dict, payload: dict) -> str:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(url, headers=headers, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            # NOTE: This will vary per provider; keep generic & simple
-            # You should adjust once you wire real providers.
-            if "choices" in data:
-                # OpenAI-style
-                return data["choices"][0].get("message", {}).get("content", "")
-            if "output_text" in data:
-                # Gemini-style (example)
-                return data["output_text"]
-            if "content" in data and isinstance(data["content"], str):
-                return data["content"]
-            return str(data)
+        # OpenAI
+        self.openai_url = "https://api.openai.com/v1/chat/completions"
+        self.openai_key = os.getenv("OPENAI_API_KEY")
+        self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
 
-    async def chat(self, prompt: str, system: Optional[str] = None) -> str:
+        # xAI (fallback)
+        self.xai_url = "https://api.x.ai/v1/completions"
+        self.xai_key = os.getenv("XAI_API_KEY")
+        self.xai_model = os.getenv("XAI_MODEL", "grok-2-latest")
+
+        # Claude (optional)
+        self.claude_key = os.getenv("ANTHROPIC_API_KEY")
+        self.claude_model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+
+        # Gemini
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
+
+    async def chat(self, user_prompt: str, system: Optional[str] = None) -> str:
         if self.provider == "openai":
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                return "[OPENAI_API_KEY missing – cannot call API]"
-            url = "https://api.openai.com/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {api_key}"}
-            payload = {
-                "model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
-                "messages": [
-                    {"role": "system", "content": system or ""},
-                    {"role": "user", "content": prompt},
-                ],
-            }
-            return await self._post_json(url, headers, payload)
-
+            return await self._chat_openai(user_prompt, system)
         if self.provider == "xai":
-            api_key = os.getenv("XAI_API_KEY")
-            if not api_key:
-                return "[XAI_API_KEY missing – cannot call API]"
-            url = "https://api.x.ai/v1/chat/completions"
-            headers = {"Authorization": f"Bearer {api_key}"}
-            payload = {
-                "model": os.getenv("XAI_MODEL", "grok-2-latest"),
-                "messages": [
-                    {"role": "system", "content": system or ""},
-                    {"role": "user", "content": prompt},
-                ],
-            }
-            return await self._post_json(url, headers, payload)
-
-        if self.provider == "gemini":
-            api_key = os.getenv("GEMINI_API_KEY")
-            if not api_key:
-                return "[GEMINI_API_KEY missing – cannot call API]"
-            # Placeholder; real Gemini endpoint differs
-            url = (
-                "https://generativelanguage.googleapis.com/v1beta/models/"
-                "gemini-1.5-flash:generateContent?key=" + api_key
-            )
-            headers = {"Content-Type": "application/json"}
-            payload = {
-                "contents": [
-                    {"parts": [{"text": (system or "") + "\n" + prompt}]}
-                ],
-            }
-            return await self._post_json(url, headers, payload)
-
+            return await self._chat_xai(user_prompt, system)
         if self.provider == "anthropic":
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                return "[ANTHROPIC_API_KEY missing – cannot call API]"
-            url = "https://api.anthropic.com/v1/messages"
-            headers = {
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-            }
-            payload = {
-                "model": os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022"),
-                "max_tokens": 1024,
-                "messages": [{"role": "user", "content": prompt}],
-                "system": system or "",
-            }
-            return await self._post_json(url, headers, payload)
+            return await self._chat_claude(user_prompt, system)
+        raise ValueError(f"Unknown provider: {self.provider}")
 
-        return "[Unknown provider – set LLM_PROVIDER to xai/openai/gemini/anthropic]"
+    async def _post_json(self, url: str, headers: Dict[str, str], data: Dict[str, Any]) -> Dict[str, Any]:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(url, json=data, headers=headers)
+            resp.raise_for_status()
+            return resp.json()
+
+    #
+    # OpenAI chat (non-stream)
+    #
+    async def _chat_openai(self, user_prompt: str, system: Optional[str]):
+        headers = {
+            "Authorization": f"Bearer {self.openai_key}",
+            "Content-Type": "application/json",
+        }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user_prompt})
+        payload = {
+            "model": self.openai_model,
+            "messages": messages,
+            "temperature": 0.3,
+        }
+        js = await self._post_json(self.openai_url, headers, payload)
+        return js["choices"][0]["message"]["content"]
+
+    #
+    # OpenAI streaming (generator) - synchronous generator using httpx streaming
+    #
+    def stream_openai_chat(self, user_prompt: str, system: Optional[str] = None) -> Generator[str, None, None]:
+        """
+        Yields incremental text chunks from the OpenAI streaming API.
+        Use in synchronous code (Streamlit) like:
+          for chunk in client.stream_openai_chat(prompt, system): ...
+        """
+        headers = {
+            "Authorization": f"Bearer {self.openai_key}",
+            "Content-Type": "application/json",
+        }
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": user_prompt})
+        payload = {
+            "model": self.openai_model,
+            "messages": messages,
+            "temperature": 0.3,
+            "stream": True
+        }
+
+        # Use httpx synchronous client streaming
+        with httpx.Client(timeout=120.0) as client:
+            with client.stream("POST", self.openai_url, json=payload, headers=headers) as resp:
+                if resp.status_code >= 400:
+                    text = resp.text
+                    yield f"[ERROR] {text}"
+                    return
+                # OpenAI streams lines starting with "data: "
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        s = line.decode("utf-8") if isinstance(line, bytes) else str(line)
+                    except Exception:
+                        s = str(line)
+                    if s.startswith("data: "):
+                        data = s[len("data: "):].strip()
+                        if data == "[DONE]":
+                            break
+                        try:
+                            import json
+                            js = json.loads(data)
+                            # choices -> delta -> content
+                            delta = js.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content")
+                            if content:
+                                yield content
+                        except Exception:
+                            # non-json chunk
+                            yield s
+                    else:
+                        # fallback: yield raw
+                        yield s
+
+    #
+    # xAI simple completions fallback
+    #
+    async def _chat_xai(self, user_prompt: str, system: Optional[str]):
+        headers = {"Authorization": f"Bearer {self.xai_key}", "Content-Type": "application/json"}
+        full_prompt = (f"System: {system}\n\n" if system else "") + f"User: {user_prompt}"
+        payload = {"model": self.xai_model, "prompt": full_prompt, "temperature": 0.3}
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(self.xai_url, json=payload, headers=headers)
+            resp.raise_for_status()
+            js = resp.json()
+            return js.get("text", str(js))
+
+    #
+    # Claude (placeholder)
+    #
+    async def _chat_claude(self, user_prompt: str, system: Optional[str]):
+        raise NotImplementedError("Claude support not implemented in this client.")

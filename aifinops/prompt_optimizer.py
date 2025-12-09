@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List
 
 from .config import get_settings
 from .llm_clients import LLMClient
@@ -14,9 +13,12 @@ class PromptVariant:
     notes: str
 
 async def optimize_prompt(original_prompt: str) -> PromptVariant:
-    """V5 – have LLM rewrite a prompt to be cheaper while preserving intent."""
+    """
+    Use an LLM to rewrite a prompt to be shorter (cheaper) while preserving behavior.
+    """
     settings = get_settings()
     provider = settings.llm_config.provider if settings.llm_config else None
+
     if not provider:
         return PromptVariant(
             original=original_prompt,
@@ -29,17 +31,18 @@ async def optimize_prompt(original_prompt: str) -> PromptVariant:
 
     sys = (
         "You are a prompt compression expert. Rewrite prompts to use fewer tokens while "
-        "keeping behavior the same. Avoid verbosity, remove repetition, keep structure."
+        "keeping the same intent and constraints. Avoid verbosity and repetition."
     )
     user = (
-        "Rewrite this prompt to be 40% shorter BUT functionally equivalent. Then estimate token savings "
-        "as a percentage. Respond in JSON with keys: optimized, savings_pct. Prompt:\n\n"
-        + original_prompt
+        "Rewrite this prompt to be about 40% shorter but functionally equivalent. "
+        "Then estimate token savings as a percentage. "
+        "Respond ONLY in JSON with keys: optimized (string), savings_pct (number).\n\n"
+        f"Prompt:\n{original_prompt}\n"
     )
+
     raw = await client.chat(user, system=sys)
 
     import json
-
     try:
         data = json.loads(raw)
         optimized = data.get("optimized", original_prompt)

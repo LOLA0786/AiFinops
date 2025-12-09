@@ -1,3 +1,10 @@
 httpx
 python-dotenv
 boto3
+streamlit
+pandas
+numpy
+PyGithub
+matplotlib
+seaborn
+prophet
