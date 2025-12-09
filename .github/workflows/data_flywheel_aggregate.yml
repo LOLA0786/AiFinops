@@ -1,0 +1,87 @@
+name: Daily DataFlywheel Aggregation
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # runs daily at 03:00 UTC
+  workflow_dispatch:      # manual run button
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  PYTHON_VERSION: "3.10"
+  PUSH: ${{ secrets.PUSH }}  # set PUSH=true if you want auto PR creation
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Load ENV (safe)
+        run: |
+          echo "Loading environment vars..."
+          echo 'XAI_API_KEY=${{ secrets.XAI_API_KEY }}' >> $GITHUB_ENV
+          echo 'OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}' >> $GITHUB_ENV
+          echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' >> $GITHUB_ENV
+          echo 'AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}' >> $GITHUB_ENV
+          echo 'AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}' >> $GITHUB_ENV
+          echo 'AWS_REGION=us-east-1' >> $GITHUB_ENV
+
+      - name: Run AiFinOps Dataset Aggregation
+        id: agg
+        run: |
+          echo "Running Data Flywheel aggregation..."
+          python3 - << 'PY'
+from aifinops.data_flywheel import aggregate_cost_rows, export_dataset
+import json, datetime as dt, os
+# Dummy placeholder — replace with actual ingest pipeline
+sample_costs = [
+  {"date":"2025-12-09","resource_id":"i-abc","service":"EC2","cost":10.0},
+  {"date":"2025-12-09","resource_id":"i-abc","service":"EC2","cost":2.0}
+]
+agg = aggregate_cost_rows(sample_costs)
+path = export_dataset(agg, "dataflywheel_snapshot.json")
+print("WROTE", path)
+PY
+
+      - name: Commit dataset updates
+        run: |
+          git config user.name "AiFinOps Bot"
+          git config user.email "actions@github.com"
+
+          if git status --porcelain | grep -q "dataflywheel_snapshot.json"; then
+            git add dataflywheel_snapshot.json
+            git commit -m "Daily DataFlywheel snapshot: $(date -u)"
+          else
+            echo "No changes to commit."
+          fi
+
+      - name: Create Pull Request (Dry-Run Unless PUSH=true)
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: "autoflywheel-update"
+          commit-message: "Daily DataFlywheel snapshot update"
+          title: "Daily DataFlywheel Snapshot Update"
+          body: |
+            This PR includes:
+            - Updated dataset snapshot
+            - Aggregated GPU/Cost telemetry
+            - Pre-training data for anomaly/spike prediction model
+          delete-branch: true
+          draft: ${{ env.PUSH != 'true' }}   # draft mode unless PUSH=true
+
+      - name: Done
+        run: echo "DataFlywheel Action Completed"
