@@ -1,0 +1,1 @@
+print('megamoats init ok')

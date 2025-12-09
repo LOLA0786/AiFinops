@@ -1,0 +1,2 @@
+image: ghcr.io/yourorg/aifinops-gpu-agent:latest
+replicaCount: 1
