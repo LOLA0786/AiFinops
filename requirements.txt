@@ -8,3 +8,7 @@ PyGithub
 matplotlib
 seaborn
 prophet
+# GPU monitoring extras
+nvidia-ml-py3        # optional; used if NVML available
+psutil               # process checks
+plotly               # nicer heatmaps (optional)

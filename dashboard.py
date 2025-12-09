@@ -116,3 +116,13 @@ if st.button("Estimate spot conversion"):
         st.write("- " + r)
 
 st.success("Pro features loaded. Use CONFIRM_AUTO_ACTIONS=true to enable real apply operations (dangerous).")
+
+# ---- GPU Optimizer Panel ----
+try:
+    from aifinops.gpu_dashboard import render_gpu_overview, render_gpu_issues_and_explain, render_cost_estimator
+    st.header("GPU Optimizer")
+    render_gpu_overview()
+    render_gpu_issues_and_explain()
+    render_cost_estimator()
+except Exception as e:
+    st.warning("GPU panel load failed: " + str(e))
