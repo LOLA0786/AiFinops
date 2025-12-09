@@ -1,0 +1,15 @@
+# Normalize line endings
+* text=auto eol=lf
+
+# Large file storage (GPU logs, parquet, models)
+*.parquet filter=lfs diff=lfs merge=lfs
+*.pt filter=lfs diff=lfs merge=lfs
+*.bin filter=lfs diff=lfs merge=lfs
+*.ckpt filter=lfs diff=lfs merge=lfs
+*.h5 filter=lfs diff=lfs merge=lfs
+
+# Prevent binary diffs
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
