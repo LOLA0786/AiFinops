@@ -1,0 +1,3 @@
+apiVersion: v2
+name: aifinops-autonomous-router
+version: 0.1.0
