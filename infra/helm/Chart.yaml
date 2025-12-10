@@ -1,0 +1,3 @@
+apiVersion: v2
+name: aifinops-megamoats
+version: 0.1.0

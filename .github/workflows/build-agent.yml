@@ -1,0 +1,9 @@
+name: Build Agent
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build agent image
+        run: echo "Build docker image steps here"
